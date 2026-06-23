@@ -1,0 +1,2768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartShiftAI — ML Workforce Planning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ================================================================== */
+    /* DESIGN TOKENS                                                        */
+    /* ================================================================== */
+    :root {
+      --bg:            #0f1117;
+      --surface:       #151820;
+      --surface2:      #1c2030;
+      --surface3:      #222640;
+      --border:        #2a2e45;
+      --border-soft:   #1f2235;
+      --accent:        #00d4aa;
+      --accent-dim:    #00a88a;
+      --accent-glow:   rgba(0, 212, 170, 0.15);
+      --accent-glow2:  rgba(0, 212, 170, 0.06);
+      --blue:          #4d8ef0;
+      --blue-dim:      #3a6fd4;
+      --text:          #e2e5f0;
+      --text-muted:    #6b7190;
+      --text-dim:      #4a4f6a;
+      --danger:        #ff5370;
+      --warning:       #ffcb6b;
+      --success:       #00d4aa;
+      --sidebar-w:     232px;
+      --topbar-h:      56px;
+      --radius:        12px;
+      --radius-sm:     8px;
+      --radius-xs:     5px;
+      --font:          'Inter', system-ui, sans-serif;
+      --shadow:        0 4px 24px rgba(0,0,0,0.4);
+      --shadow-sm:     0 2px 12px rgba(0,0,0,0.3);
+    }
+
+    /* ================================================================== */
+    /* RESET & BASE                                                         */
+    /* ================================================================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+    /* ================================================================== */
+    /* BOOT SCREEN                                                          */
+    /* ================================================================== */
+    #boot-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #boot-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #boot-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .boot-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Glowing icon ring */
+    .boot-icon-ring {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0, 212, 170, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      position: relative;
+      animation: ring-pulse 2s ease-in-out infinite;
+    }
+
+    .boot-icon-ring::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 212, 170, 0.12);
+      animation: ring-pulse 2s ease-in-out infinite 0.4s;
+    }
+
+    .boot-icon-ring::after {
+      content: '';
+      position: absolute;
+      inset: -18px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 212, 170, 0.06);
+      animation: ring-pulse 2s ease-in-out infinite 0.8s;
+    }
+
+    @keyframes ring-pulse {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.04); }
+    }
+
+    .boot-icon-inner {
+      font-size: 2rem;
+      filter: drop-shadow(0 0 12px rgba(0, 212, 170, 0.6));
+    }
+
+    .boot-logo {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .boot-logo span { color: var(--accent); }
+
+    .boot-tagline {
+      margin-top: 10px;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Progress bar */
+    .boot-progress-wrap {
+      margin-top: 48px;
+      width: 280px;
+    }
+
+    .boot-bar-track {
+      width: 100%;
+      height: 2px;
+      background: var(--surface3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .boot-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      border-radius: 2px;
+      transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 10px rgba(0, 212, 170, 0.5);
+    }
+
+    .boot-msg {
+      margin-top: 14px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+      height: 18px;
+      transition: opacity 0.25s ease;
+    }
+
+    .boot-msg.fade { opacity: 0; }
+
+    /* ================================================================== */
+    /* MAIN APP LAYOUT                                                      */
+    /* ================================================================== */
+    #app {
+      display: none;
+      height: 100vh;
+      flex-direction: column;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    #app.visible   { display: flex; }
+    #app.revealed  { opacity: 1; }
+
+    /* ------------------------------------------------------------------ */
+    /* TOP BAR                                                              */
+    /* ------------------------------------------------------------------ */
+    #topbar {
+      height: var(--topbar-h);
+      min-height: var(--topbar-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      z-index: 100;
+    }
+
+    .topbar-logo {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .topbar-logo span { color: var(--accent); }
+
+    .topbar-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .topbar-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .topbar-spacer { flex: 1; }
+
+    /* Session pill */
+    .session-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 5px 14px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .session-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px rgba(0, 212, 170, 0.6);
+      animation: dot-blink 2.4s ease-in-out infinite;
+    }
+
+    @keyframes dot-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Reset button in topbar */
+    .topbar-reset {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-family: var(--font);
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+
+    .topbar-reset:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(255, 83, 112, 0.05);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* BODY ROW (sidebar + content)                                         */
+    /* ------------------------------------------------------------------ */
+    #body-row {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* SIDEBAR                                                              */
+    /* ------------------------------------------------------------------ */
+    #sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 0 20px;
+      overflow-y: auto;
+    }
+
+    .sidebar-section-label {
+      padding: 16px 20px 6px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .sidebar-section-label:first-child { padding-top: 6px; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.875rem;
+      transition: color 0.15s, background 0.15s;
+      user-select: none;
+      position: relative;
+    }
+
+    .nav-item:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+      background: var(--accent-glow2);
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 0 3px 3px 0;
+    }
+
+    .nav-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .nav-label { flex: 1; }
+
+    /* Alert badge */
+    .nav-badge {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      background: var(--danger);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      border-radius: 100px;
+      line-height: 1;
+    }
+
+    .nav-badge.visible { display: flex; }
+
+    /* ------------------------------------------------------------------ */
+    /* MAIN CONTENT                                                         */
+    /* ------------------------------------------------------------------ */
+    #main {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    /* Inner padded wrapper used by each page */
+    .page-inner {
+      padding: 32px 40px 48px;
+      max-width: 1200px;
+    }
+
+    /* ================================================================== */
+    /* SECTION PAGES                                                        */
+    /* ================================================================== */
+    .page { display: none; }
+    .page.active { display: block; animation: page-in 0.25s ease; }
+
+    @keyframes page-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Page header */
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .page-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .page-subtitle {
+      margin-top: 4px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .page-actions { display: flex; gap: 10px; align-items: center; }
+
+    /* ================================================================== */
+    /* CARDS                                                                */
+    /* ================================================================== */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ================================================================== */
+    /* KPI GRID                                                             */
+    /* ================================================================== */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .kpi-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .kpi-card:hover { border-color: rgba(0, 212, 170, 0.3); transform: translateY(-2px); }
+    .kpi-card:hover::after { opacity: 1; }
+
+    .kpi-card.animate { animation: kpi-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    @keyframes kpi-pop {
+      0%   { opacity: 0; transform: translateY(10px) scale(0.96); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .kpi-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .kpi-value {
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 6px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-sub {
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    /* ================================================================== */
+    /* EMPTY STATES                                                         */
+    /* ================================================================== */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 64px 32px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+    }
+
+    .empty-state h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      font-size: 0.84rem;
+      max-width: 320px;
+      line-height: 1.7;
+    }
+
+    .empty-cta {
+      margin-top: 20px;
+      padding: 9px 20px;
+      background: var(--accent-glow);
+      border: 1px solid rgba(0, 212, 170, 0.3);
+      border-radius: var(--radius-sm);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font);
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .empty-cta:hover { background: rgba(0, 212, 170, 0.2); }
+
+    /* ================================================================== */
+    /* BUTTONS                                                              */
+    /* ================================================================== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 0.84rem;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0a1a16;
+    }
+
+    .btn-primary:hover { background: #00efc1; box-shadow: 0 0 20px rgba(0, 212, 170, 0.35); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover { border-color: var(--text-muted); background: var(--surface3); }
+    .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+
+    /* Loading spinner inline */
+    .btn-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(10, 26, 22, 0.3);
+      border-top-color: #0a1a16;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    .btn.loading .btn-spinner { display: block; }
+    .btn.loading .btn-text { opacity: 0.7; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ================================================================== */
+    /* STATUS BADGES                                                        */
+    /* ================================================================== */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-success { background: rgba(0,212,170,0.12);  color: var(--accent); }
+    .badge-warning { background: rgba(255,203,107,0.12); color: var(--warning); }
+    .badge-danger  { background: rgba(255,83,112,0.12);  color: var(--danger); }
+    .badge-info    { background: rgba(77,142,240,0.12);  color: var(--blue); }
+
+    /* ================================================================== */
+    /* DIVIDER                                                              */
+    /* ================================================================== */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 20px 0;
+    }
+
+    /* ================================================================== */
+    /* TOAST NOTIFICATIONS                                                  */
+    /* ================================================================== */
+    #toast-area {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 8000;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 13px 16px;
+      min-width: 280px;
+      max-width: 380px;
+      font-size: 0.84rem;
+      line-height: 1.5;
+      animation: toast-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: pointer;
+      pointer-events: all;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .toast-title { font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    .toast-body  { color: var(--text-muted); }
+
+    .toast.warning { border-left-color: var(--warning); }
+    .toast.error   { border-left-color: var(--danger); }
+    .toast.success { border-left-color: var(--success); }
+    .toast.info    { border-left-color: var(--blue); }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(28px) scale(0.96); }
+      to   { opacity: 1; transform: translateX(0) scale(1); }
+    }
+
+    /* ================================================================== */
+    /* ALERTS PAGE — notification panel                                    */
+    /* ================================================================== */
+
+    /* Filter tabs */
+    .alert-filter-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .alert-tab {
+      padding: 5px 14px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .alert-tab:hover  { border-color: var(--text-muted); color: var(--text); }
+    .alert-tab.active { background: var(--accent-glow); border-color: rgba(0,212,170,0.4); color: var(--accent); }
+
+    /* Count pill */
+    .alerts-count-pill {
+      padding: 4px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Scrollable panel */
+    .alerts-panel {
+      max-height: 580px;
+      overflow-y: auto;
+    }
+
+    .alert-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .alert-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 13px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-sm);
+      font-size: 0.84rem;
+      animation: page-in 0.2s ease;
+      transition: background 0.15s;
+    }
+
+    .alert-item:hover { background: var(--surface2); }
+    .alert-item.warning { border-left-color: var(--warning); }
+    .alert-item.error   { border-left-color: var(--danger);  }
+    .alert-item.success { border-left-color: var(--accent);  }
+    .alert-item.info    { border-left-color: #4d8ef0;        }
+
+    /* New-item pulse ring */
+    .alert-item.new-arrival {
+      animation: alert-arrive 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    @keyframes alert-arrive {
+      0%   { opacity:0; transform:translateX(-8px); }
+      100% { opacity:1; transform:translateX(0); }
+    }
+
+    .alert-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+
+    .alert-dot.warning { background: var(--warning); }
+    .alert-dot.error   { background: var(--danger);  }
+    .alert-dot.info    { background: #4d8ef0; }
+
+    .alert-body { flex: 1; }
+    .alert-msg  { color: var(--text); line-height: 1.5; }
+    .alert-meta {
+      display: flex;
+      gap: 10px;
+      margin-top: 3px;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    .alert-type-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .alert-type-tag.warning { background:rgba(255,203,107,0.12); color:var(--warning); }
+    .alert-type-tag.success { background:rgba(0,212,170,0.12);   color:var(--accent);  }
+    .alert-type-tag.info    { background:rgba(77,142,240,0.12);   color:#4d8ef0;        }
+    .alert-type-tag.error   { background:rgba(255,83,112,0.12);   color:var(--danger);  }
+
+    /* ================================================================== */
+    /* STEP INDICATOR (for pipeline flow on dashboard)                      */
+    /* ================================================================== */
+    .pipeline-steps {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 8px;
+    }
+
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .step-node {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      transition: all 0.3s;
+    }
+
+    .step-node.done  { border-color: var(--accent); background: var(--accent-glow); color: var(--accent); }
+    .step-node.active { border-color: var(--blue); background: rgba(77,142,240,0.1); color: var(--blue); box-shadow: 0 0 12px rgba(77,142,240,0.3); }
+
+    .step-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+    .step-label.done   { color: var(--accent); }
+    .step-label.active { color: var(--blue); }
+
+    .step-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+      margin: 0 4px;
+      transition: background 0.3s;
+    }
+
+    .step-line.done { background: var(--accent-dim); }
+
+    /* ================================================================== */
+    /* SECTION: DASHBOARD WELCOME                                           */
+    /* ================================================================== */
+    .welcome-banner {
+      background: linear-gradient(135deg, #141928 0%, #0f1a28 50%, #0f1117 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 36px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .welcome-banner::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      right: -60px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,212,170,0.08) 0%, transparent 70%);
+    }
+
+    .welcome-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .welcome-title span { color: var(--accent); }
+
+    .welcome-sub {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      max-width: 480px;
+      line-height: 1.7;
+    }
+    /* ================================================================== */
+    /* SCHEDULE SECTION                                                     */
+    /* ================================================================== */
+    .schedule-controls-card { padding: 20px 24px; }
+
+    .schedule-controls-row {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .schedule-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .insight-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 4px;
+      animation: page-in 0.3s ease;
+    }
+
+    .insight-icon { font-size: 1.6rem; flex-shrink: 0; }
+    .insight-body { flex: 1; }
+    .insight-label { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .insight-sub   { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+    .schedule-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .schedule-section-header > span { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+
+    .shift-legend { display: flex; gap: 14px; }
+
+    .shift-legend-item {
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 100px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .shift-legend-item.morning   { border-color: rgba(255,203,107,0.3); color: #ffcb6b; }
+    .shift-legend-item.afternoon { border-color: rgba(77,142,240,0.3);  color: #4d8ef0; }
+    .shift-legend-item.evening   { border-color: rgba(180,100,255,0.3); color: #b464ff; }
+
+    .shift-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .shift-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .shift-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+    .shift-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .worker-id-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .worker-num {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .classification-badge {
+      padding: 4px 10px;
+      border-radius: 100px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .classification-badge.Morning   { background: rgba(255,203,107,0.12); color: #ffcb6b; border: 1px solid rgba(255,203,107,0.2); }
+    .classification-badge.Afternoon { background: rgba(77,142,240,0.12);  color: #4d8ef0; border: 1px solid rgba(77,142,240,0.2); }
+    .classification-badge.Evening   { background: rgba(180,100,255,0.12); color: #b464ff; border: 1px solid rgba(180,100,255,0.2); }
+
+    .shift-time-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .shift-arrow  { color: var(--text-dim); font-size: 0.75rem; }
+
+    .shift-hours-label {
+      display: inline-block;
+      padding: 2px 8px;
+      background: var(--surface2);
+      border-radius: var(--radius-xs);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .shift-insight-tag {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 100px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      align-self: flex-start;
+    }
+
+    .shift-insight-tag.success { background: rgba(0,212,170,0.1);   color: var(--accent); }
+    .shift-insight-tag.info    { background: rgba(77,142,240,0.1);   color: #4d8ef0; }
+    .shift-insight-tag.danger  { background: rgba(255,83,112,0.1);   color: var(--danger); }
+
+    /* ================================================================== */
+    /* HISTORY & HEATMAP SECTION                                           */
+    /* ================================================================== */
+
+    /* Heatmap grid */
+    .heatmap-grid {
+      display: grid;
+      gap: 3px;
+      width: 100%;
+    }
+
+    /* Day header cells */
+    .heatmap-day-header {
+      text-align: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      padding: 6px 2px;
+    }
+
+    /* Slot label column */
+    .heatmap-slot-label {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      padding-right: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px;
+    }
+
+    /* Data cells */
+    .heatmap-cell {
+      border-radius: var(--radius-xs);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 600;
+      min-height: 44px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      cursor: default;
+      position: relative;
+    }
+
+    .heatmap-cell:hover {
+      transform: scale(1.06);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+      z-index: 2;
+    }
+
+    /* Tooltip on hover */
+    .heatmap-cell[data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1c2030;
+      border: 1px solid #2a2e45;
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 0.72rem;
+      color: #e2e5f0;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Legend */
+    .heatmap-legend-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .heatmap-legend-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .heatmap-legend-bar {
+      flex: 1;
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(
+        90deg,
+        rgba(0,212,170,0.1) 0%,
+        rgba(0,212,170,0.4) 50%,
+        rgba(0,212,170,1.0) 100%
+      );
+    }
+
+    /* ================================================================== */
+    /* COST ANALYSIS SECTION                                               */
+    /* ================================================================== */
+    .cost-controls-card  { padding: 20px 24px; }
+    .adjust-controls-card { padding: 20px 24px; }
+
+    .cost-controls-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    #hist-avg-workers-row .schedule-field {
+      flex: 1;
+      min-width: 80px;
+    }
+
+    .adjust-controls-row {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    /* Savings KPI card coloring */
+    .kpi-card.savings-positive .kpi-value { color: var(--success); }
+    .kpi-card.savings-negative .kpi-value { color: var(--danger); }
+    .kpi-card.savings-positive { border-color: rgba(0,212,170,0.25); }
+    .kpi-card.savings-negative { border-color: rgba(255,83,112,0.25); }
+
+    /* Adjustment result card */
+    .adjust-status-card {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 20px 24px;
+      animation: kpi-pop 0.35s ease;
+      transition: border-color 0.3s, background 0.3s;
+    }
+
+    .adjust-status-card.high_demand {
+      background: rgba(255,83,112,0.05);
+      border-color: rgba(255,83,112,0.35);
+    }
+
+    .adjust-status-card.over_staffed {
+      background: rgba(255,203,107,0.04);
+      border-color: rgba(255,203,107,0.25);
+    }
+
+    .adjust-status-card.optimal {
+      background: rgba(0,212,170,0.05);
+      border-color: rgba(0,212,170,0.3);
+    }
+
+    .adjust-status-inner {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .adjust-status-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+
+    .adjust-status-body { flex: 1; }
+
+    .adjust-status-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .adjust-status-message {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 3px;
+    }
+
+    .adjust-status-detail {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ================================================================== */
+    /* FORECAST SECTION                                                     */
+    /* ================================================================== */
+    .forecast-controls-card { padding: 20px 24px; }
+
+    .forecast-controls-row {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .forecast-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .field-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+    }
+
+    .field-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.875rem;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+      color-scheme: dark;
+      max-width: 200px;
+    }
+
+    .field-input:focus { border-color: var(--accent); }
+
+    .field-hint {
+      font-size: 0.73rem;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    .forecast-days-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .range-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 160px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface3);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .range-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(0,212,170,0.4);
+      transition: transform 0.1s;
+    }
+
+    .range-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    .range-val {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 52px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Peak day highlight */
+    .peak-day-card {
+      background: linear-gradient(135deg, #141928 0%, #0f1e22 100%);
+      border-color: rgba(0,212,170,0.2);
+      animation: kpi-pop 0.35s ease;
+    }
+
+    .peak-day-inner {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .peak-day-icon {
+      font-size: 2.2rem;
+      flex-shrink: 0;
+    }
+
+    .peak-day-body { flex: 1; }
+
+    .peak-day-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+    }
+
+    .peak-day-date {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 2px;
+    }
+
+    .peak-day-customers {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .peak-day-customers span {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .peak-day-badge {
+      background: var(--accent-glow);
+      border: 1px solid rgba(0,212,170,0.25);
+      border-radius: var(--radius-sm);
+      padding: 8px 16px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* Chart legend */
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-swatch {
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    /* Workers-needed pill in table */
+    .workers-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 24px;
+      padding: 0 8px;
+      background: var(--accent-glow);
+      border: 1px solid rgba(0,212,170,0.2);
+      border-radius: 100px;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.82rem;
+    }
+
+    .slot-weight-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slot-weight-track {
+      width: 70px;
+      height: 4px;
+      background: var(--surface3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .slot-weight-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    }
+  </style>
+  <style>
+    #upload-dropzone {
+      cursor: pointer;
+      border: 2px dashed var(--border);
+      background: var(--surface);
+      border-radius: var(--radius);
+      transition: border-color 0.2s, background 0.2s;
+      padding: 0;
+    }
+
+    #upload-dropzone:hover,
+    #upload-dropzone:focus,
+    #upload-dropzone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-glow2);
+      outline: none;
+    }
+
+    .dropzone-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 56px 32px;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .dropzone-icon {
+      font-size: 2.8rem;
+      margin-bottom: 6px;
+      transition: transform 0.2s;
+    }
+
+    #upload-dropzone:hover .dropzone-icon,
+    #upload-dropzone.drag-over .dropzone-icon { transform: scale(1.1); }
+
+    .dropzone-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .dropzone-sub {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+    }
+
+    .dropzone-browse {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    /* Column requirements grid */
+    .col-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .col-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-soft);
+    }
+
+    .col-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 7px;
+      border-radius: 100px;
+      width: fit-content;
+    }
+
+    .required-badge { background: rgba(255,83,112,0.12); color: var(--danger); }
+    .optional-badge  { background: rgba(77,142,240,0.12); color: var(--blue); }
+
+    .col-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+    }
+
+    .col-desc {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Upload stats card */
+    .upload-stats-card { animation: kpi-pop 0.35s ease; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .stat-item {
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-soft);
+    }
+
+    .stat-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Data table */
+    .table-scroll { overflow-x: auto; }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    .data-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .data-table td {
+      padding: 9px 12px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border-soft);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .data-table tbody tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover td { background: var(--surface2); }
+
+    .weight-bar-wrap {
+      width: 60px;
+      height: 5px;
+      background: var(--surface3);
+      border-radius: 3px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    .weight-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--accent);
+    }
+
+    /* ================================================================== */
+    /* TRAIN SECTION                                                        */
+    /* ================================================================== */
+    .model-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-dot.idle    { background: var(--text-dim); }
+    .status-dot.training { background: var(--warning); animation: dot-blink 0.8s ease-in-out infinite; }
+    .status-dot.ready   { background: var(--accent); box-shadow: 0 0 6px rgba(0,212,170,0.5); }
+    .status-dot.error   { background: var(--danger); }
+
+    .train-controls-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .train-info-block {
+      padding: 12px 14px;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-soft);
+    }
+
+    .train-info-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .train-info-val {
+      font-size: 0.8rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .accent-text { color: var(--accent); font-weight: 600; }
+
+    /* Accuracy flash animation */
+    @keyframes accuracy-flash {
+      0%   { background: rgba(0,212,170,0.25); }
+      100% { background: transparent; }
+    }
+
+    .kpi-card.flash { animation: accuracy-flash 1.2s ease; }
+
+    /* Error quality dots in eval table */
+    .quality-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    /* ── Cost Analysis: Schedule Sync styles ─────────────────────────── */
+    .cost-sync-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, rgba(99,179,237,.15), rgba(66,153,225,.1));
+      border: 1px solid rgba(99,179,237,.4);
+      border-radius: 10px;
+      padding: 10px 16px;
+      margin-bottom: 14px;
+      font-size: 0.82rem;
+      color: var(--text-secondary, #a0aec0);
+      animation: syncFadeIn .4s ease;
+    }
+    @keyframes syncFadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .sync-banner-icon { font-size: 1rem; flex-shrink: 0; }
+    .sync-banner-msg  { flex: 1; line-height: 1.4; }
+    .sync-banner-unlock {
+      background: rgba(99,179,237,.2);
+      border: 1px solid rgba(99,179,237,.5);
+      border-radius: 6px;
+      color: #63b3ed;
+      font-size: 0.78rem;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: background .2s;
+      white-space: nowrap;
+    }
+    .sync-banner-unlock:hover  { background: rgba(99,179,237,.35); }
+    .sync-banner-unlock:disabled { opacity: .6; cursor: default; }
+
+    /* Auto-filled (read-only) inputs */
+    input.synced-from-schedule {
+      border-color: rgba(99,179,237,.55) !important;
+      background: rgba(99,179,237,.07) !important;
+      color: #63b3ed !important;
+      cursor: not-allowed;
+    }
+    input.synced-from-schedule:disabled {
+      opacity: .85;
+    }
+    input.synced-unlocked {
+      border-color: rgba(154,230,180,.55) !important;
+      background: rgba(154,230,180,.07) !important;
+      color: #9ae6b4 !important;
+    }
+    /* Tiny badge next to field labels */
+    .auto-tag {
+      display: inline-block;
+      background: rgba(99,179,237,.2);
+      color: #63b3ed;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: .5px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 4px;
+      vertical-align: middle;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ======================================================================
+     BOOT SCREEN
+     ====================================================================== -->
+<div id="boot-screen" role="status" aria-label="Loading SmartShiftAI">
+  <canvas id="boot-canvas" aria-hidden="true"></canvas>
+  <div class="boot-content">
+    <div class="boot-icon-ring" aria-hidden="true">
+      <div class="boot-icon-inner">⚡</div>
+    </div>
+    <div class="boot-logo">SmartShift<span>AI</span></div>
+    <div class="boot-tagline">ML-Powered Workforce Planning</div>
+    <div class="boot-progress-wrap">
+      <div class="boot-bar-track">
+        <div class="boot-bar-fill" id="boot-bar"></div>
+      </div>
+      <div class="boot-msg" id="boot-msg">Initializing AI systems…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MAIN APP
+     ====================================================================== -->
+<div id="app" aria-hidden="true">
+
+  <!-- TOP BAR -->
+  <header id="topbar">
+    <div class="topbar-logo">SmartShift<span>AI</span></div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-subtitle">ML Workforce Planning</div>
+    <div class="topbar-spacer"></div>
+    <div class="session-pill">
+      <div class="session-dot"></div>
+      <span id="session-label">Session Active</span>
+    </div>
+    <button class="topbar-reset" id="reset-btn" title="Reset session">
+      <span>↺</span> Reset
+    </button>
+  </header>
+
+  <!-- BODY ROW -->
+  <div id="body-row">
+
+    <!-- SIDEBAR -->
+    <nav id="sidebar" aria-label="Main navigation">
+
+      <div class="sidebar-section-label">Pipeline</div>
+
+      <div class="nav-item active" data-page="dashboard" role="button" tabindex="0">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Dashboard</span>
+      </div>
+
+      <div class="nav-item" data-page="upload" role="button" tabindex="0">
+        <span class="nav-icon">📁</span>
+        <span class="nav-label">Upload Data</span>
+      </div>
+
+      <div class="nav-item" data-page="train" role="button" tabindex="0">
+        <span class="nav-icon">🧠</span>
+        <span class="nav-label">Train Model</span>
+      </div>
+
+      <div class="nav-item" data-page="forecast" role="button" tabindex="0">
+        <span class="nav-icon">🔮</span>
+        <span class="nav-label">Forecast</span>
+      </div>
+
+      <div class="nav-item" data-page="schedule" role="button" tabindex="0">
+        <span class="nav-icon">🗓️</span>
+        <span class="nav-label">Schedule</span>
+      </div>
+
+      <div class="sidebar-section-label">Analysis</div>
+
+      <div class="nav-item" data-page="costs" role="button" tabindex="0">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label">Cost Analysis</span>
+      </div>
+
+      <div class="nav-item" data-page="history" role="button" tabindex="0">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">History</span>
+      </div>
+
+      <div class="nav-item" data-page="alerts" role="button" tabindex="0">
+        <span class="nav-icon">🔔</span>
+        <span class="nav-label">Alerts</span>
+        <span class="nav-badge" id="alert-badge">0</span>
+      </div>
+
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main id="main">
+
+      <!-- ----------------------------------------------------------------
+           DASHBOARD
+           ---------------------------------------------------------------- -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-inner">
+
+          <div class="welcome-banner">
+            <div class="welcome-title">Welcome to <span>SmartShiftAI</span></div>
+            <div class="welcome-sub">Upload historical CSV data to kick off the ML pipeline. The system will train a demand forecasting model, generate concrete shift schedules, and estimate your labor costs — all in this session.</div>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-label">Data Rows</div>
+              <div class="kpi-value" id="kv-rows">—</div>
+              <div class="kpi-sub">Uploaded</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Model</div>
+              <div class="kpi-value" id="kv-model">—</div>
+              <div class="kpi-sub">Algorithm</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Forecast Days</div>
+              <div class="kpi-value" id="kv-forecast">—</div>
+              <div class="kpi-sub">Generated</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">Shifts Planned</div>
+              <div class="kpi-value" id="kv-shifts">—</div>
+              <div class="kpi-sub">Workers scheduled</div>
+            </div>
+          </div>
+
+          <!-- Pipeline progress -->
+          <div class="card">
+            <div class="card-title">📋 Pipeline Progress</div>
+            <div class="pipeline-steps" id="pipeline-steps">
+              <div class="pipeline-step">
+                <div class="step-node" id="step-upload">1</div>
+                <div class="step-label" id="step-lbl-upload">Upload</div>
+              </div>
+              <div class="step-line" id="line-1"></div>
+              <div class="pipeline-step">
+                <div class="step-node" id="step-train">2</div>
+                <div class="step-label" id="step-lbl-train">Train</div>
+              </div>
+              <div class="step-line" id="line-2"></div>
+              <div class="pipeline-step">
+                <div class="step-node" id="step-forecast">3</div>
+                <div class="step-label" id="step-lbl-forecast">Forecast</div>
+              </div>
+              <div class="step-line" id="line-3"></div>
+              <div class="pipeline-step">
+                <div class="step-node" id="step-schedule">4</div>
+                <div class="step-label" id="step-lbl-schedule">Schedule</div>
+              </div>
+              <div class="step-line" id="line-4"></div>
+              <div class="pipeline-step">
+                <div class="step-node" id="step-cost">5</div>
+                <div class="step-label" id="step-lbl-cost">Cost</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------------
+           UPLOAD DATA
+           ---------------------------------------------------------------- -->
+      <section class="page" id="page-upload">
+        <div class="page-inner">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Upload Data</div>
+              <div class="page-subtitle">Provide historical shift data to begin the ML pipeline.</div>
+            </div>
+          </div>
+
+          <!-- Drop zone -->
+          <div class="card" id="upload-dropzone"
+               role="button" tabindex="0"
+               aria-label="Upload CSV file — click or drag and drop"
+               aria-describedby="upload-hint">
+            <div class="dropzone-inner" id="dropzone-inner">
+              <div class="dropzone-icon" aria-hidden="true">📂</div>
+              <div class="dropzone-title">Drag &amp; drop your CSV here</div>
+              <div class="dropzone-sub">or <span class="dropzone-browse">browse to upload</span></div>
+              <input type="file" id="csv-file-input" accept=".csv"
+                     style="display:none" aria-hidden="true" />
+            </div>
+          </div>
+
+          <!-- Column requirements -->
+          <div class="card" style="margin-top:16px">
+            <div class="card-title">📋 Required CSV Columns</div>
+            <div class="col-grid" id="upload-hint">
+              <div class="col-item required">
+                <span class="col-badge required-badge">Required</span>
+                <span class="col-name">Date</span>
+                <span class="col-desc">YYYY-MM-DD format</span>
+              </div>
+              <div class="col-item required">
+                <span class="col-badge required-badge">Required</span>
+                <span class="col-name">Day</span>
+                <span class="col-desc">Mon–Sun or 0–6</span>
+              </div>
+              <div class="col-item required">
+                <span class="col-badge required-badge">Required</span>
+                <span class="col-name">Customers</span>
+                <span class="col-desc">Daily customer count</span>
+              </div>
+              <div class="col-item required">
+                <span class="col-badge required-badge">Required</span>
+                <span class="col-name">Sales</span>
+                <span class="col-desc">Daily sales figure</span>
+              </div>
+              <div class="col-item required">
+                <span class="col-badge required-badge">Required</span>
+                <span class="col-name">Workers</span>
+                <span class="col-desc">Staff on shift that day</span>
+              </div>
+              <div class="col-item optional">
+                <span class="col-badge optional-badge">Optional</span>
+                <span class="col-name">Time Slot</span>
+                <span class="col-desc">e.g. "10:00 AM - 12:00 PM" — unlocks intraday heatmap &amp; slot-anchored scheduling</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload status + stats (hidden until upload succeeds) -->
+          <div id="upload-result" style="display:none; margin-top:16px">
+            <div class="card upload-stats-card">
+              <div class="card-title">
+                <span id="upload-status-icon">✅</span>
+                <span id="upload-status-text">Upload successful</span>
+                <span class="badge badge-success" style="margin-left:auto" id="upload-badge">Ready</span>
+              </div>
+              <div class="stats-grid" id="upload-stats-grid">
+                <div class="stat-item">
+                  <div class="stat-label">Rows</div>
+                  <div class="stat-value" id="stat-rows">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Date Range</div>
+                  <div class="stat-value" id="stat-range">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Avg Customers/Day</div>
+                  <div class="stat-value" id="stat-avg-cust">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Avg Workers/Day</div>
+                  <div class="stat-value" id="stat-avg-work">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Time Slots</div>
+                  <div class="stat-value" id="stat-timeslot">—</div>
+                </div>
+              </div>
+              <!-- Time slot breakdown table (shown only if has_time_slot) -->
+              <div id="slot-table-wrap" style="display:none; margin-top:20px">
+                <div class="divider"></div>
+                <div class="card-title" style="margin-bottom:12px">⏱ Time Slot Breakdown</div>
+                <div class="table-scroll">
+                  <table class="data-table" id="slot-table">
+                    <thead>
+                      <tr>
+                        <th>Time Slot</th>
+                        <th>Avg Customers</th>
+                        <th>Avg Workers</th>
+                        <th>Demand Weight</th>
+                        <th>Rows</th>
+                      </tr>
+                    </thead>
+                    <tbody id="slot-table-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- CTA to next step -->
+            <div style="margin-top:16px; display:flex; gap:12px; align-items:center">
+              <button class="btn btn-primary" id="go-train-btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-text">▶ Train Model</span>
+              </button>
+              <span class="upload-helper-text" style="color:var(--text-muted);font-size:0.82rem">
+                Model training is fast — usually under 10 seconds.
+              </span>
+            </div>
+          </div>
+
+          <!-- Error display -->
+          <div id="upload-error" style="display:none; margin-top:16px">
+            <div class="card error-card">
+              <div class="card-title" style="color:var(--danger)">❌ Upload Failed</div>
+              <div id="upload-error-msg" style="color:var(--text-muted);font-size:0.875rem"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------------
+           TRAIN MODEL
+           ---------------------------------------------------------------- -->
+      <section class="page" id="page-train">
+        <div class="page-inner">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Train Model</div>
+              <div class="page-subtitle">Adaptive ML model training with 9 engineered features and chronological evaluation.</div>
+            </div>
+            <div class="page-actions">
+              <div class="model-status-pill" id="model-status-pill">
+                <span class="status-dot idle" id="model-status-dot"></span>
+                <span id="model-status-text">Idle — no model trained</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Train button + controls -->
+          <div class="card" id="train-controls-card">
+            <div class="card-title">⚙️ Training Controls</div>
+            <div class="train-controls-row">
+              <div class="train-info-block">
+                <div class="train-info-label">Algorithm Selection</div>
+                <div class="train-info-val">Adaptive — <span class="accent-text">GradientBoosting</span> (≥60 train rows) or <span class="accent-text">Ridge</span> (&lt;60)</div>
+              </div>
+              <div class="train-info-block">
+                <div class="train-info-label">Features Engineered</div>
+                <div class="train-info-val">lag1, lag2, lag7, sales_lag1, rolling_mean_7, rolling_std_7, sin_day, cos_day, sales_per_customer</div>
+              </div>
+              <div class="train-info-block">
+                <div class="train-info-label">Evaluation Split</div>
+                <div class="train-info-val">Chronological 80 / 20 — no shuffle (time-series integrity)</div>
+              </div>
+            </div>
+            <div style="margin-top:20px; display:flex; gap:12px; align-items:center; flex-wrap:wrap">
+              <button class="btn btn-primary" id="train-btn" disabled>
+                <span class="btn-spinner"></span>
+                <span class="btn-text">🧠 Train Model</span>
+              </button>
+              <span id="train-prereq-hint" style="font-size:0.82rem; color:var(--text-muted)">
+                Upload a CSV first to enable training.
+              </span>
+            </div>
+          </div>
+
+          <!-- Metrics row (hidden until trained) -->
+          <div id="train-metrics" style="display:none">
+            <div class="kpi-row" style="margin-bottom:0">
+              <div class="kpi-card">
+                <div class="kpi-label">Accuracy</div>
+                <div class="kpi-value" id="tm-accuracy">—</div>
+                <div class="kpi-sub">On test set</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">MAE</div>
+                <div class="kpi-value" id="tm-mae" style="font-size:1.4rem">—</div>
+                <div class="kpi-sub">Mean Absolute Error</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">RMSE</div>
+                <div class="kpi-value" id="tm-rmse" style="font-size:1.4rem">—</div>
+                <div class="kpi-sub">Root Mean Sq. Error</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Model</div>
+                <div class="kpi-value" id="tm-model" style="font-size:1rem; padding-top:8px">—</div>
+                <div class="kpi-sub" id="tm-split">Train / Test split</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Next-Day Forecast</div>
+                <div class="kpi-value" id="tm-next">—</div>
+                <div class="kpi-sub">Predicted customers</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actual vs Predicted chart -->
+          <div class="card" id="train-chart-card" style="display:none; margin-top:16px">
+            <div class="card-title" style="justify-content:space-between">
+              <span>📉 Actual vs Predicted Customer Counts</span>
+              <div style="display:flex;gap:12px;align-items:center;font-size:0.78rem;font-weight:400">
+                <span style="display:flex;align-items:center;gap:5px">
+                  <span style="display:inline-block;width:20px;height:2px;background:var(--accent)"></span> Actual
+                </span>
+                <span style="display:flex;align-items:center;gap:5px">
+                  <span style="display:inline-block;width:20px;height:2px;background:var(--blue);border-top:2px dashed var(--blue)"></span> Predicted
+                </span>
+              </div>
+            </div>
+            <div style="position:relative;height:280px">
+              <canvas id="train-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Evaluation table -->
+          <div class="card" id="train-table-card" style="display:none; margin-top:16px">
+            <div class="card-title">🔬 Evaluation — Test Set (up to 20 rows)</div>
+            <div class="table-scroll">
+              <table class="data-table" id="eval-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Actual</th>
+                    <th>Predicted</th>
+                    <th>Error %</th>
+                    <th>Quality</th>
+                  </tr>
+                </thead>
+                <tbody id="eval-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- CTA to Forecast -->
+          <div id="train-cta" style="display:none; margin-top:16px">
+            <button class="btn btn-primary" id="go-forecast-btn">
+              <span class="btn-text">▶ Generate Forecast</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------------
+           FORECAST
+           ---------------------------------------------------------------- -->
+      <!-- ----------------------------------------------------------------
+           FORECAST
+           ---------------------------------------------------------------- -->
+      <section class="page" id="page-forecast">
+        <div class="page-inner">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Demand Forecast</div>
+              <div class="page-subtitle">ML-generated customer demand predictions with time-slot breakdown.</div>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" id="forecast-btn" disabled>
+                <span class="btn-spinner"></span>
+                <span class="btn-text">🔮 Run Forecast</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Controls card -->
+          <div class="card forecast-controls-card">
+            <div class="forecast-controls-row">
+              <div class="forecast-field">
+                <label class="field-label" for="forecast-date">Start Date</label>
+                <input type="date" id="forecast-date" class="field-input" />
+                <span class="field-hint">Leave blank to forecast from the day after your last data point</span>
+              </div>
+              <div class="forecast-field" style="display:none">
+                <input type="hidden" id="forecast-days-slider" value="1" />
+                <span id="forecast-days-val" style="display:none">1 day</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI strip (hidden until forecast runs) -->
+          <div id="forecast-kpis" style="display:none">
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">Forecast Period</div>
+                <div class="kpi-value" id="fc-label" style="font-size:1rem;padding-top:4px">—</div>
+                <div class="kpi-sub" id="fc-model-sub">—</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Peak Day</div>
+                <div class="kpi-value" id="fc-peak-val">—</div>
+                <div class="kpi-sub" id="fc-peak-date">—</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Avg Customers/Day</div>
+                <div class="kpi-value" id="fc-avg">—</div>
+                <div class="kpi-sub">Forecast period</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Peak day highlight card -->
+          <div id="forecast-peak-card" class="card peak-day-card" style="display:none">
+            <div class="peak-day-inner">
+              <div class="peak-day-icon">🏔️</div>
+              <div class="peak-day-body">
+                <div class="peak-day-title">Peak Demand Day</div>
+                <div class="peak-day-date" id="fc-peak-day-name">—</div>
+                <div class="peak-day-customers"><span id="fc-peak-customers">—</span> predicted customers</div>
+              </div>
+              <div class="peak-day-badge" id="fc-peak-badge">
+                <span id="fc-peak-label">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dual-axis history + forecast chart -->
+          <div class="card" id="forecast-chart-card" style="display:none">
+            <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span>📈 14-Day History + Forecast</span>
+              <div class="chart-legend">
+                <span class="legend-item">
+                  <span class="legend-swatch" style="background:var(--text-muted);opacity:0.6"></span>
+                  Historical
+                </span>
+                <span class="legend-item">
+                  <span class="legend-swatch" style="background:var(--accent)"></span>
+                  Forecast
+                </span>
+              </div>
+            </div>
+            <div style="position:relative;height:290px">
+              <canvas id="forecast-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Time-slot demand table -->
+          <div class="card" id="forecast-slot-card" style="display:none">
+            <div class="card-title" id="forecast-slot-title">⏱ Peak-Day Demand by Time Slot</div>
+            <div class="table-scroll">
+              <table class="data-table" id="forecast-slot-table">
+                <thead>
+                  <tr>
+                    <th>Time Slot</th>
+                    <th>Predicted Customers</th>
+                    <th>Workers Needed</th>
+                    <th>Demand Weight</th>
+                  </tr>
+                </thead>
+                <tbody id="forecast-slot-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- CTA to Schedule -->
+          <div id="forecast-cta" style="display:none;margin-top:16px">
+            <button class="btn btn-primary" id="go-schedule-btn">
+              <span class="btn-text">▶ Generate Schedule</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------------
+           SCHEDULE
+           ---------------------------------------------------------------- -->
+      <!-- ----------------------------------------------------------------
+           SCHEDULE
+           ---------------------------------------------------------------- -->
+      <section class="page" id="page-schedule">
+        <div class="page-inner">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Shift Schedule</div>
+              <div class="page-subtitle">Generated worker shift cards anchored to your operational window.</div>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" id="schedule-btn" disabled>
+                <span class="btn-spinner"></span>
+                <span class="btn-text">🗓️ Generate Schedule</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Controls card -->
+          <div class="card schedule-controls-card">
+            <div class="card-title">⚙️ Schedule Parameters</div>
+            <div class="schedule-controls-row">
+              <div class="schedule-field">
+                <label class="field-label" for="sched-customers">Predicted Customers</label>
+                <input type="number" id="sched-customers" class="field-input"
+                       min="1" max="10000" step="1" placeholder="Auto from forecast" />
+                <span class="field-hint">Leave blank to use forecast peak</span>
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="sched-wage">Hourly Wage ($)</label>
+                <input type="number" id="sched-wage" class="field-input"
+                       min="1" max="500" step="0.5" value="15" />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="sched-hours">Shift Duration (hrs)</label>
+                <div class="forecast-days-row">
+                  <input type="range" id="sched-hours-slider" min="3" max="12" step="0.5" value="8" class="range-slider" />
+                  <span class="range-val" id="sched-hours-val">8 hrs</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary KPIs (hidden until generated) -->
+          <div id="schedule-kpis" style="display:none">
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">Workers Scheduled</div>
+                <div class="kpi-value" id="sk-workers">—</div>
+                <div class="kpi-sub" id="sk-customers-sub">—</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Total Shift Hours</div>
+                <div class="kpi-value" id="sk-total-hours">—</div>
+                <div class="kpi-sub">All workers combined</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Est. Labor Cost</div>
+                <div class="kpi-value" id="sk-cost" style="font-size:1.4rem">—</div>
+                <div class="kpi-sub" id="sk-cpw-sub">—</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Avg Shift Length</div>
+                <div class="kpi-value" id="sk-avg-hours">—</div>
+                <div class="kpi-sub">Hours per worker</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Insight badge bar -->
+          <div id="schedule-insight-bar" style="display:none" class="insight-bar">
+            <div class="insight-icon" id="sched-insight-icon">✅</div>
+            <div class="insight-body">
+              <div class="insight-label" id="sched-insight-label">—</div>
+              <div class="insight-sub" id="sched-insight-sub">—</div>
+            </div>
+            <span class="badge" id="sched-insight-badge">—</span>
+          </div>
+
+          <!-- Shift cards grid -->
+          <div id="schedule-cards-wrap" style="display:none">
+            <div class="schedule-section-header">
+              <span id="schedule-section-title">👷 Worker Shifts</span>
+              <div class="shift-legend">
+                <span class="shift-legend-item morning">🌅 Morning</span>
+                <span class="shift-legend-item afternoon">☀️ Afternoon</span>
+                <span class="shift-legend-item evening">🌙 Evening</span>
+              </div>
+            </div>
+            <div class="shift-cards-grid" id="shift-cards-grid"></div>
+          </div>
+
+          <!-- CTA to Cost Analysis -->
+          <div id="schedule-cta" style="display:none;margin-top:16px">
+            <button class="btn btn-primary" id="go-costs-btn">
+              <span class="btn-text">▶ Analyse Costs</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------------
+           COST ANALYSIS
+           ---------------------------------------------------------------- -->
+      <section class="page" id="page-costs">
+        <div class="page-inner">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Cost Analysis</div>
+              <div class="page-subtitle">Labor cost optimisation and real-time workforce adjustment.</div>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" id="optimize-btn" disabled>
+                <span class="btn-spinner"></span>
+                <span class="btn-text">💰 Run Analysis</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Sync banner — shown automatically after schedule runs -->
+          <div id="cost-sync-banner" class="cost-sync-banner" style="display:none">
+            <span class="sync-banner-icon">🔗</span>
+            <span class="sync-banner-msg">Auto-filled from Schedule</span>
+            <button class="sync-banner-unlock" id="cost-sync-unlock-btn" title="Unlock fields to edit manually">🔓 Unlock</button>
+          </div>
+
+          <!-- Optimisation inputs -->
+          <div class="card cost-controls-card">
+            <div class="card-title">⚙️ Cost Parameters</div>
+            <div class="cost-controls-row">
+              <div class="schedule-field">
+                <label class="field-label" for="opt-predicted-workers">Predicted Workers <span class="auto-tag">auto</span></label>
+                <input type="number" id="opt-predicted-workers" class="field-input"
+                       min="1" max="10000" step="1" placeholder="Auto from schedule" />
+                <span class="field-hint">Auto-filled from Schedule Generation</span>
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="opt-actual-workers">Historical Avg Workers</label>
+                <input type="number" id="opt-actual-workers" class="field-input"
+                       min="1" max="10000" step="0.5" placeholder="e.g. 5.5" />
+                <span class="field-hint">Your typical headcount before ML optimisation</span>
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="opt-wage">Hourly Wage ($) <span class="auto-tag">auto</span></label>
+                <input type="number" id="opt-wage" class="field-input synced-from-schedule"
+                       min="1" max="500" step="0.5" value="15" disabled />
+                <span class="field-hint">Synced from Schedule — unlock to override</span>
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="opt-hours">Shift Hours <span class="auto-tag">auto</span></label>
+                <input type="number" id="opt-hours" class="field-input synced-from-schedule"
+                       min="1" max="24" step="0.5" value="8" disabled />
+                <span class="field-hint">Synced from Schedule — unlock to override</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Historical Average Worker/Day (Mon-Sun) -->
+          <div class="card cost-controls-card" id="hist-avg-workers-card">
+            <div class="card-title">📅 Historical Average Worker/Day <span class="auto-tag">auto</span></div>
+            <div class="cost-controls-row" id="hist-avg-workers-row">
+              <div class="schedule-field">
+                <label class="field-label" for="hist-avg-mon">Mon</label>
+                <input type="number" id="hist-avg-mon" class="field-input synced-from-schedule"
+                       min="0" max="10000" step="0.1" value="0" disabled />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="hist-avg-tue">Tue</label>
+                <input type="number" id="hist-avg-tue" class="field-input synced-from-schedule"
+                       min="0" max="10000" step="0.1" value="0" disabled />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="hist-avg-wed">Wed</label>
+                <input type="number" id="hist-avg-wed" class="field-input synced-from-schedule"
+                       min="0" max="10000" step="0.1" value="0" disabled />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="hist-avg-thu">Thu</label>
+                <input type="number" id="hist-avg-thu" class="field-input synced-from-schedule"
+                       min="0" max="10000" step="0.1" value="0" disabled />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="hist-avg-fri">Fri</label>
+                <input type="number" id="hist-avg-fri" class="field-input synced-from-schedule"
+                       min="0" max="10000" step="0.1" value="0" disabled />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="hist-avg-sat">Sat</label>
+                <input type="number" id="hist-avg-sat" class="field-input synced-from-schedule"
+                       min="0" max="10000" step="0.1" value="0" disabled />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="hist-avg-sun">Sun</label>
+                <input type="number" id="hist-avg-sun" class="field-input synced-from-schedule"
+                       min="0" max="10000" step="0.1" value="0" disabled />
+              </div>
+            </div>
+            <span class="field-hint">Auto-calculated from your uploaded data — average workers per weekday</span>
+          </div>
+
+          <!-- KPI row — hidden until analysis runs -->
+          <div id="cost-kpis" style="display:none">
+            <div class="kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">Predicted Labor Cost</div>
+                <div class="kpi-value" id="ck-predicted">—</div>
+                <div class="kpi-sub" id="ck-pred-sub">Optimised workforce</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Historical Labor Cost</div>
+                <div class="kpi-value" id="ck-actual">—</div>
+                <div class="kpi-sub" id="ck-actual-sub">Before ML optimisation</div>
+              </div>
+              <div class="kpi-card" id="savings-kpi-card">
+                <div class="kpi-label">Savings</div>
+                <div class="kpi-value" id="ck-savings">—</div>
+                <div class="kpi-sub" id="ck-savings-pct">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Comparison bar chart -->
+          <div class="card" id="cost-chart-card" style="display:none">
+            <div class="card-title">📊 Predicted vs Historical Labor Cost</div>
+            <div style="position:relative;height:260px">
+              <canvas id="cost-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="divider" style="margin:28px 0 20px"></div>
+
+          <!-- Real-time adjustment section -->
+          <div class="page-header" style="margin-bottom:16px">
+            <div>
+              <div class="page-title" style="font-size:1.1rem">⚡ Real-Time Adjustment</div>
+              <div class="page-subtitle">Enter live customer count to adjust staffing on-the-fly.</div>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-secondary" id="adjust-btn">
+                <span class="btn-spinner"></span>
+                <span class="btn-text">Check Staffing</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card adjust-controls-card">
+            <div class="adjust-controls-row">
+              <div class="schedule-field">
+                <label class="field-label" for="adj-scheduled">Scheduled Workers</label>
+                <input type="number" id="adj-scheduled" class="field-input"
+                       min="1" max="10000" step="1" placeholder="Auto from schedule" />
+              </div>
+              <div class="schedule-field">
+                <label class="field-label" for="adj-customers">Actual Customer Count (Now)</label>
+                <input type="number" id="adj-customers" class="field-input"
+                       min="0" max="100000" step="1" placeholder="e.g. 120" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Adjustment result card (hidden until submitted) -->
+          <div id="adjust-result" style="display:none;margin-top:16px">
+            <div class="adjust-status-card" id="adjust-status-card">
+              <div class="adjust-status-inner">
+                <div class="adjust-status-icon" id="adj-icon">⚡</div>
+                <div class="adjust-status-body">
+                  <div class="adjust-status-label" id="adj-status-label">—</div>
+                  <div class="adjust-status-message" id="adj-message">—</div>
+                  <div class="adjust-status-detail" id="adj-detail">—</div>
+                </div>
+                <span class="badge" id="adj-badge">—</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------------
+           HISTORY
+           ---------------------------------------------------------------- -->
+      <section class="page" id="page-history">
+        <div class="page-inner">
+          <div class="page-header">
+            <div>
+              <div class="page-title">History Explorer</div>
+              <div class="page-subtitle">Weekly trends, demand heatmap, and day-of-week analytics.</div>
+            </div>
+            <div class="page-actions">
+              <button class="btn btn-primary" id="history-load-btn" disabled>
+                <span class="btn-spinner"></span>
+                <span class="btn-text">📈 Load History</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Summary stats row -->
+          <div id="history-summary" style="display:none">
+            <div class="kpi-row" id="history-kpi-row">
+              <div class="kpi-card">
+                <div class="kpi-label">Total Records</div>
+                <div class="kpi-value" id="hs-rows">—</div>
+                <div class="kpi-sub" id="hs-range">—</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Avg Customers/Day</div>
+                <div class="kpi-value" id="hs-avg-cust">—</div>
+                <div class="kpi-sub">Historical mean</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Avg Workers/Day</div>
+                <div class="kpi-value" id="hs-avg-work">—</div>
+                <div class="kpi-sub">Historical mean</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Peak Day</div>
+                <div class="kpi-value" id="hs-peak-val">—</div>
+                <div class="kpi-sub" id="hs-peak-date">—</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Total Sales</div>
+                <div class="kpi-value" id="hs-sales" style="font-size:1.2rem">—</div>
+                <div class="kpi-sub">All records</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Weekly trend chart -->
+          <div class="card" id="history-trend-card" style="display:none">
+            <div class="card-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span>📅 Weekly Trend — Avg Customers &amp; Workers</span>
+              <div class="chart-legend">
+                <span class="legend-item">
+                  <span class="legend-swatch" style="background:var(--accent)"></span>
+                  Customers
+                </span>
+                <span class="legend-item">
+                  <span class="legend-swatch" style="background:#4d8ef0"></span>
+                  Workers
+                </span>
+              </div>
+            </div>
+            <div style="position:relative;height:280px">
+              <canvas id="history-trend-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Day-of-week bar chart -->
+          <div class="card" id="history-dow-card" style="display:none;margin-top:16px">
+            <div class="card-title">📊 Day-of-Week Avg Customers</div>
+            <div style="position:relative;height:220px">
+              <canvas id="history-dow-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Demand Heatmap -->
+          <div class="card" id="history-heatmap-card" style="display:none;margin-top:16px">
+            <div class="card-title" style="margin-bottom:16px">
+              🌡️ Demand Heatmap
+              <span class="badge badge-info" id="heatmap-type-badge" style="margin-left:8px;font-size:0.7rem">—</span>
+            </div>
+            <div id="heatmap-container">
+              <!-- Rendered by JS -->
+            </div>
+            <div class="heatmap-legend-row">
+              <span class="heatmap-legend-label">Low</span>
+              <div class="heatmap-legend-bar"></div>
+              <span class="heatmap-legend-label">High</span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------------
+           ALERTS
+           ---------------------------------------------------------------- -->
+      <section class="page" id="page-alerts">
+        <div class="page-inner">
+          <div class="page-header">
+            <div>
+              <div class="page-title">Alerts</div>
+              <div class="page-subtitle">System notifications — pipeline events, demand spikes, and workforce warnings.</div>
+            </div>
+            <div class="page-actions">
+              <span class="alerts-count-pill" id="alerts-count-pill" style="display:none">
+                <span id="alerts-total-count">0</span> notifications
+              </span>
+              <button class="btn btn-ghost" id="clear-alerts-btn">
+                <span class="btn-text">🗑 Clear All</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filter tabs -->
+          <div class="alert-filter-tabs" id="alert-filter-tabs">
+            <button class="alert-tab active" data-filter="all">All</button>
+            <button class="alert-tab" data-filter="warning">⚠ Warnings</button>
+            <button class="alert-tab" data-filter="success">✅ Success</button>
+            <button class="alert-tab" data-filter="info">ℹ Info</button>
+          </div>
+
+          <!-- Scrollable notification panel -->
+          <div class="alerts-panel" id="alerts-container">
+            <div class="empty-state">
+              <div class="empty-icon">🔔</div>
+              <h3>No Alerts Yet</h3>
+              <p>Notifications appear here as the pipeline runs — training completions, demand spikes, and workforce adjustments.</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Toast area -->
+<div id="toast-area" aria-live="polite" aria-atomic="false"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
