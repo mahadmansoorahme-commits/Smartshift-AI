@@ -9,4 +9,4 @@ python-dotenv==1.0.1
 PyJWT==2.9.0
 cryptography==43.0.1
 certifi==2024.8.30
-waitress==3.0.0
+requests==2.34.2

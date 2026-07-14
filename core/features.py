@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from config import DAY_MAP, REQUIRED_COLS
+from core.scheduler import parse_slot
 
 
 def parse_day(val) -> int | None:
@@ -87,3 +88,70 @@ def rebuild_feature_row(
     spc       = sl1 / lag1 if lag1 > 0 else 0.0
 
     return [lag1, lag2, lag7, sl1, roll_mean, roll_std, sin_d, cos_d, spc]
+
+
+def compute_time_slot_info(df: pd.DataFrame) -> dict:
+    """
+    Aggregate per-Time-Slot stats (avg customers/workers, weight, business
+    hours) from a cleaned DataFrame. This mirrors the inline logic in
+    routes/upload.py's own Time Slot processing step exactly, but as a
+    reusable function — used by core/persistence.py's hydrate_csv to rebuild
+    has_time_slot/time_slot_info from a CSV re-downloaded from Supabase
+    Storage on a container that never ran the original /upload request.
+
+    routes/upload.py is intentionally left untouched and does not call this;
+    it keeps its own inline computation.
+
+    Returns {"has_time_slot", "time_slot_info", "total_business_hours"}.
+    """
+    has_time_slot = "Time Slot" in df.columns
+    time_slot_info: list[dict] = []
+    total_business_hours = 12.0
+
+    if has_time_slot:
+        d = df.copy()
+        d["Time Slot"] = d["Time Slot"].astype(str).str.strip()
+        d = d[~d["Time Slot"].str.lower().isin(["", "nan", "none", "nat"])]
+        if d.empty:
+            return {"has_time_slot": False, "time_slot_info": [], "total_business_hours": total_business_hours}
+
+        slot_agg = (
+            d.groupby("Time Slot")
+             .agg(
+                 slot_avg_customers=("Customers", "mean"),
+                 slot_avg_workers=("Workers", "mean"),
+                 slot_count=("Customers", "count"),
+             )
+             .reset_index()
+        )
+        slot_total = float(slot_agg["slot_avg_customers"].sum())
+        n_slots    = len(slot_agg)
+        slot_agg["weight"] = (
+            slot_agg["slot_avg_customers"] / slot_total if slot_total > 0 else 1.0 / n_slots
+        )
+
+        def _slot_key(s):
+            parsed = parse_slot(s)
+            return parsed[0] if parsed else float("inf")
+
+        slot_agg = slot_agg.iloc[slot_agg["Time Slot"].map(_slot_key).argsort().values].reset_index(drop=True)
+        time_slot_info = [
+            {
+                "slot":          row["Time Slot"],
+                "avg_customers": round(float(row["slot_avg_customers"]), 2),
+                "avg_workers":   math.ceil(float(row["slot_avg_workers"])),
+                "weight":        round(float(row["weight"]), 4),
+                "count":         int(row["slot_count"]),
+            }
+            for _, row in slot_agg.iterrows()
+        ]
+        spans = [parse_slot(s) for s in slot_agg["Time Slot"]]
+        spans = [sp for sp in spans if sp is not None]
+        if spans:
+            total_business_hours = round(max(sp[1] for sp in spans) - min(sp[0] for sp in spans), 2)
+
+    return {
+        "has_time_slot":        has_time_slot,
+        "time_slot_info":       time_slot_info,
+        "total_business_hours": total_business_hours,
+    }

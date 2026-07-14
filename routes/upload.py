@@ -14,6 +14,7 @@ from flask import Blueprint, g, jsonify, request
 from config import REQUIRED_COLS, TEMP_DIR
 from core.auth import require_auth
 from core.features import parse_day
+from core.persistence import SupabaseError, save_upload
 from core.scheduler import parse_slot
 from core.sessions import push_notification, rate_limit
 
@@ -145,6 +146,16 @@ def upload():
     avg_customers = round(float(df["Customers"].mean()), 1)
     avg_workers   = math.ceil(float(df["Workers"].mean()))
     row_count     = len(df)
+
+    if g.token:
+        try:
+            save_upload(g.uid, g.token, Path(tmp.name).read_bytes(), {
+                "filename":   file.filename,
+                "row_count":  row_count,
+                "date_range": f"{date_min} → {date_max}",
+            })
+        except SupabaseError as exc:
+            return jsonify({"error": f"Upload processed but could not be saved: {exc}"}), 502
 
     push_notification(g.session, f"CSV uploaded: {row_count} rows, {date_min} → {date_max}", "success")
 

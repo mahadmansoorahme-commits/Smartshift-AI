@@ -35,3 +35,39 @@ CREATE POLICY "uploads delete own" ON storage.objects
   FOR DELETE USING (
     bucket_id = 'user-uploads' AND (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ============================================================================
+-- Storage bucket for trained model (.pkl) files
+-- Files are stored at path:  {user_id}/current.pkl
+-- ============================================================================
+
+-- Private bucket
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('user-models', 'user-models', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- RLS: each user can only touch files inside their own {user_id}/ folder.
+DROP POLICY IF EXISTS "models read own"   ON storage.objects;
+DROP POLICY IF EXISTS "models insert own" ON storage.objects;
+DROP POLICY IF EXISTS "models update own" ON storage.objects;
+DROP POLICY IF EXISTS "models delete own" ON storage.objects;
+
+CREATE POLICY "models read own" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'user-models' AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "models insert own" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'user-models' AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "models update own" ON storage.objects
+  FOR UPDATE USING (
+    bucket_id = 'user-models' AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "models delete own" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'user-models' AND (storage.foldername(name))[1] = auth.uid()::text
+  );

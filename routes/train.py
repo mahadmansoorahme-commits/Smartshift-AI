@@ -9,6 +9,7 @@ import pandas as pd
 from flask import Blueprint, g, jsonify
 
 from core.auth import require_auth
+from core.persistence import SupabaseError, hydrate_csv, save_model
 from core.sessions import push_notification, rate_limit
 from core.trainer import csv_etag, train as _train
 
@@ -19,6 +20,7 @@ train_bp = Blueprint("train", __name__)
 @require_auth
 @rate_limit(max_calls=5, window=60)
 def train():
+    hydrate_csv(g.session, g.uid, g.token)
     csv_path = g.session.get("csv_path")
     if not csv_path or not Path(csv_path).exists():
         return jsonify({"error": "No uploaded data found. Please upload a CSV first."}), 400
@@ -44,6 +46,13 @@ def train():
     g.session["train_result"] = result
     g.session["model_type"]   = result["model_type"]
     g.session["model_path"]   = result["model_path"]
+
+    if g.token:
+        try:
+            model_bytes = Path(result["model_path"]).read_bytes()
+            save_model(g.uid, g.token, model_bytes, result)
+        except SupabaseError as exc:
+            return jsonify({"error": f"Model trained but could not be saved: {exc}"}), 502
 
     push_notification(
         g.session,

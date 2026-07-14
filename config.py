@@ -52,7 +52,10 @@ class Config:
 # ---------------------------------------------------------------------------
 # File-system paths
 # ---------------------------------------------------------------------------
-MODEL_DIR = Path(os.environ.get("MODEL_DIR", "model/_store"))
+# Default to a tempfile-based path (mirrors TEMP_DIR below) so the fallback
+# works out of the box on read-only-filesystem hosts like Vercel, where only
+# /tmp is writable. Set MODEL_DIR explicitly to use a persistent volume.
+MODEL_DIR = Path(os.environ.get("MODEL_DIR") or (Path(tempfile.gettempdir()) / "smartshift_models"))
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 TEMP_DIR = Path(tempfile.gettempdir()) / "smartshift_csv"

@@ -110,33 +110,50 @@ def verify_token(token: str) -> dict | None:
     return None
 
 
+def get_current_user_and_token() -> tuple[dict | None, str | None]:
+    """
+    Return (user, raw_access_token) for the current request, or (None, None)
+    when the request carries no valid token.
+
+    The raw token is needed (in addition to the decoded claims) so route code
+    can forward it as-is to Supabase's REST/Storage APIs, letting Postgres
+    and Storage Row Level Security enforce per-user isolation exactly as if
+    the browser had called Supabase directly.
+    """
+    token  = _extract_token()
+    claims = verify_token(token or "")
+    if not claims:
+        return None, None
+    uid = claims.get("sub")
+    if not uid:
+        return None, None
+    user = {
+        "id":    uid,
+        "email": claims.get("email", ""),
+        "role":  claims.get("role", "authenticated"),
+    }
+    return user, token
+
+
 def get_current_user() -> dict | None:
     """
     Return the current authenticated user as
         {"id": <uuid>, "email": <str>}
     or None when the request carries no valid token.
     """
-    claims = verify_token(_extract_token() or "")
-    if not claims:
-        return None
-    uid = claims.get("sub")
-    if not uid:
-        return None
-    return {
-        "id":    uid,
-        "email": claims.get("email", ""),
-        "role":  claims.get("role", "authenticated"),
-    }
+    user, _ = get_current_user_and_token()
+    return user
 
 
 def require_auth(fn):
     """Decorator: reject the request with 401 when no valid token is present."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        user = get_current_user()
+        user, token = get_current_user_and_token()
         if not user:
             return jsonify({"error": "Authentication required."}), 401
-        g.user = user
-        g.uid  = user["id"]
+        g.user  = user
+        g.uid   = user["id"]
+        g.token = token
         return fn(*args, **kwargs)
     return wrapper

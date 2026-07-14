@@ -12,6 +12,7 @@ from flask import Blueprint, g, jsonify, request
 
 from core.auth import require_auth
 from core.features import rebuild_feature_row
+from core.persistence import hydrate_csv, hydrate_model
 from core.sessions import push_notification, rate_limit
 from core.trainer import load_model_bundle
 
@@ -23,10 +24,12 @@ forecast_bp = Blueprint("forecast", __name__)
 @require_auth
 @rate_limit(max_calls=20, window=60)
 def predict():
+    hydrate_csv(g.session, g.uid, g.token)
     csv_path = g.session.get("csv_path")
     if not csv_path or not Path(csv_path).exists():
         return jsonify({"error": "No uploaded data. Please upload a CSV first."}), 400
 
+    hydrate_model(g.session, g.uid, g.token)
     try:
         model, feature_cols, model_type = load_model_bundle(g.session.get("model_path"))
     except FileNotFoundError:
