@@ -7,7 +7,7 @@ OAuth, etc.) and receives a signed access token (JWT). It sends that token on
 every API call as:  Authorization: Bearer <token>
 
 This module verifies that token (HS256, signed with the project's JWT secret)
-and extracts the Supabase user id (the `sub` claim).
+and extracts the Supabase user id (the `sub` claim)
 """
 
 from functools import wraps
