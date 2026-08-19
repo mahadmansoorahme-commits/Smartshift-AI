@@ -1,4 +1,4 @@
-"""Unit tests for core/features.py — feature engineering."""
+"""Unit tests for core/features.py — feature engineering"""
 import os
 os.environ.setdefault('FLASK_DEBUG', '1')
 
