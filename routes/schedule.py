@@ -1,7 +1,7 @@
 """
 routes/schedule.py
-/calculate  — Shift generation and scheduling.
-/adjust_workers  — Real-time staffing adjustment.
+/calculate  — Shift generation and scheduling
+/adjust_workers  — Real-time staffing adjustment
 """
 
 import math
