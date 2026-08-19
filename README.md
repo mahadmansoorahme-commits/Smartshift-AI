@@ -6,7 +6,7 @@ Single-page Flask app with full **Supabase authentication + database integration
 
 ---
 
-## ✅ What's implemented
+## What's implemented
 
 - **Authentication (Supabase)** — email/password **sign up & log in**
 - **Google sign-in** (OAuth — auto creates the account or logs in)
