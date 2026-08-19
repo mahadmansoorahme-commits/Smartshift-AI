@@ -1,6 +1,6 @@
 """
 SmartShiftAI — config.py
-All application-level constants and Flask configuration in one place.
+All application-level constants and Flask configuration in one place
 """
 
 import os
