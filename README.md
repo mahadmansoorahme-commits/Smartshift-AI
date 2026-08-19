@@ -19,7 +19,7 @@ Single-page Flask app with full **Supabase authentication + database integration
 
 ---
 
-## 🚀 Setup (for teammates cloning the repo)
+## Setup (for teammates cloning the repo)
 
 > The Supabase project (auth, database tables, Google login, storage) is **already set up
 > and shared** — you do **not** need to create anything in Supabase or run any SQL.
