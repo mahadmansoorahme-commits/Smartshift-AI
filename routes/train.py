@@ -1,6 +1,6 @@
 """
 routes/train.py
-/train  — Feature engineering, model selection, training, evaluation.
+/train  — Feature engineering, model selection, training, evaluation
 """
 
 from pathlib import Path
