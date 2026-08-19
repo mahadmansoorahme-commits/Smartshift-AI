@@ -1,7 +1,7 @@
 """
 SmartShiftAI — app.py
 Thin application factory: wires Flask, CSRF, session lifecycle,
-security headers, and registers all route Blueprints.
+security headers, and registers all route Blueprints
 """
 
 import os
