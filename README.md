@@ -61,7 +61,7 @@ configured for).
 
 ---
 
-## 🧪 Quick test checklist
+## Quick test checklist
 1. You land on the **login screen**.
 2. **Sign up** (email/password) or click **Continue with Google** → reach the dashboard.
 3. **Settings → Account**: change your name / password.
@@ -76,10 +76,10 @@ python -m pytest -q
 
 ---
 
-## 🛠 Tech stack
+## Tech stack
 Flask · scikit-learn · pandas · Chart.js · Supabase (Auth + Postgres + Storage) · PyJWT
 
-## 📦 Production
+## Production
 ```bash
 python serve.py      # waitress WSGI server, behind an HTTPS reverse proxy
 ```
